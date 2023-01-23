@@ -179,10 +179,10 @@ async def emo_add(call: types.callback_query, state: FSMContext):
         await FSMemo.next()
         await call.message.answer(f'<b>Why do you feel the emotion of {cmd}??</b>', reply_markup=nav.cancel_menu, parse_mode=types.ParseMode.HTML)
         await call.message.delete()
-    if cmd not in nav.EMOTIONS:
+    if cmd not in nav.EMOTIONS and cmd not in nav.BACK:
         await call.message.answer("Use keyboard")
         return
-    
+
 @dp.message_handler(state=FSMemo.desc_emo)
 async def desc_emo_add(message: types.Message, state: FSMContext):
     async with state.proxy() as data:
