@@ -219,7 +219,7 @@ async def generate_response(message: types.Message):
     if not is_authorized(user_id) == True:
         await message.reply("You are not authorized to use this bot. Use /start .")
         return
-    response = ask_chat_gpt(message.text)
+    response = await ask_chat_gpt(message.text)
     log_message(message, response)
     await message.reply(response)
 

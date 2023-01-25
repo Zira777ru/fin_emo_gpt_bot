@@ -1,6 +1,7 @@
 import openai
+import asyncio
 
-def ask_chat_gpt(message):
+async def ask_chat_gpt(message):
     response = openai.Completion.create(
         model="text-davinci-003",
         prompt=message,
