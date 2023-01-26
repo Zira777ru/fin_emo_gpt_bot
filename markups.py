@@ -20,7 +20,7 @@ def generate_keyboard(items, row_width=2, include_cancel_button=True):
         button = InlineKeyboardButton(text=item, callback_data=f'btn_{item}')
         buttons.append(button)
     if include_cancel_button:
-        buttons.append(InlineKeyboardButton(text='↩️Back', callback_data='btn_back'))
+        buttons.append(InlineKeyboardButton(text=BACK[0], callback_data=f'btn_{BACK[0]}'))
     keyboard = InlineKeyboardMarkup(row_width=row_width)
     keyboard.add(*buttons)
     return keyboard

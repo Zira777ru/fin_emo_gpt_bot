@@ -22,6 +22,7 @@ from modules.expenses import exp_add, get_current_month_expenses
 import markups as nav
 from modules.horoscope import horoscope
 from modules.chat_gpt import ask_chat_gpt
+from modules.coingecko import get_coin_data, coingecko
 
 dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
 if os.path.exists(dotenv_path):
@@ -83,6 +84,23 @@ class FSMemo(StatesGroup):
 class FSMdairy(StatesGroup):
     dairy = State()
 
+
+@dp.message_handler(commands=["coins"])
+async def get_coins(message: types.Message):
+    user_id = message.from_user.id
+    symbols = ['BTC', 'ETH', 'XRP']
+    data = get_coin_data(symbols)
+    data_str = ''
+    for symbol in data:
+        if data[symbol]:
+            data_str += f"{symbol} : {data[symbol]['current_price']} {data[symbol]['price_change_percentage_24h']}\n"
+        else:
+            data_str += f"No data available for {symbol}\n"
+    await bot.send_message(chat_id=user_id, text=data_str)
+
+
+
+
 @dp.message_handler(commands=["start"])
 async def register(message: types.Message):
     user_id = message.from_user.id
@@ -128,6 +146,7 @@ async def bot_call(call: types.callback_query):
     cmd = call.data.split("_")[1]
     if cmd == nav.BACK[0]:
         await call.message.answer('<b>📚Menu:</b>', reply_markup=nav.main_menu, parse_mode=types.ParseMode.HTML)
+        print('Back')
     if cmd == nav.MAIN[0]:
         await call.message.answer('<b>💲Expenses Menu:</b>', reply_markup=nav.expense_menu, parse_mode=types.ParseMode.HTML)
     if cmd == nav.EXP_MENU[0]: #Add Expense
@@ -224,22 +243,27 @@ async def generate_response(message: types.Message):
     await message.reply(response)
 
 async def alert_exp():
-    await bot.send_message(f"🖐 Привет, напоминаю ввести расходы за сегодня!",
+    await bot.send_message(chat_id=ADMIN_ID, text=f"🖐 Привет, напоминаю ввести расходы за сегодня!",
                            reply_markup=nav.main_menu,
                            parse_mode=types.ParseMode.HTML)
 
 async def scheduler():
     aioschedule.every().day.at("21:00").do(alert_exp)
+    aioschedule.every(5).minutes.do(coingecko)
     # aioschedule.every().day.at("7:30").do(morning)
     # aioschedule.every().hour.do(cm_start)
     while True:
         await aioschedule.run_pending()
         await asyncio.sleep(1)
 
+   
+
+
 async def on_startup(_):
     await bot.set_webhook(WEBHOOK_URL, drop_pending_updates=True)
     asyncio.create_task(scheduler())
     sql_start()
+    coingecko()
 
 async def on_shutdown(dispatcher):
     await bot.delete_webhook()
