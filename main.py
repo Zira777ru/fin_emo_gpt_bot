@@ -1,3 +1,5 @@
+
+# main.py
 import os
 import openai
 from aiogram import Dispatcher, Bot, types, executor
@@ -9,6 +11,7 @@ from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.executor import start_webhook
 import aioschedule
+
 
 from contextlib import suppress
 import asyncio
@@ -22,7 +25,8 @@ from modules.expenses import exp_add, get_current_month_expenses
 import markups as nav
 from modules.horoscope import horoscope
 from modules.chat_gpt import ask_chat_gpt
-from modules.coingecko import get_coin_data, coingecko
+from modules.coingecko import coingecko, coins_message
+from modules.make_image import create_portfolio_image, delete_portfolio
 
 dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
 if os.path.exists(dotenv_path):
@@ -85,21 +89,38 @@ class FSMdairy(StatesGroup):
     dairy = State()
 
 
-@dp.message_handler(commands=["coins"])
-async def get_coins(message: types.Message):
-    user_id = message.from_user.id
-    symbols = ['BTC', 'ETH', 'XRP']
-    data = get_coin_data(symbols)
-    data_str = ''
-    for symbol in data:
-        if data[symbol]:
-            data_str += f"{symbol} : {data[symbol]['current_price']} {data[symbol]['price_change_percentage_24h']}\n"
-        else:
-            data_str += f"No data available for {symbol}\n"
-    await bot.send_message(chat_id=user_id, text=data_str)
+# Handle the /buy command
+@dp.message_handler(commands=["buy"])
+async def buy(message: types.Message):
+    # Get the symbol and amount from the message text
+    symbol, amount = message.text.split()[1:]
+
+    # Fetch the current price of the cryptocurrency
+    cursor.execute("SELECT current_price FROM coins WHERE symbol=?", (symbol.lower(),))
+    current_price = cursor.fetchone()
+    if current_price != None:
+        cursor.execute('''
+        INSERT INTO portfolio (user_id, symbol, buy_price, amount, timestamp)
+        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ''', (message.from_user.id, symbol, str(current_price[0]), amount))
+        base.commit()
+        await message.answer("You have successfully bought " + amount + " " + symbol + " at price " + str(current_price[0])) 
+    else:
+        await message.answer(f'{symbol} not found')
 
 
 
+@dp.message_handler(commands=["portfolio"])
+async def portfolio(message: types.Message):
+    # Create an image of the portfolio
+    img_buffer = create_portfolio_image(message.from_user.id)
+    await message.answer_photo(img_buffer, caption="Your portfolio")
+
+@dp.message_handler(commands=["delportfolio"])
+async def delportfolio(message: types.Message):
+    # Create an image of the portfolio
+    delete_port = delete_portfolio(message.from_user.id)
+    await message.answer(f'Porfolio was deleted')
 
 @dp.message_handler(commands=["start"])
 async def register(message: types.Message):
@@ -146,7 +167,6 @@ async def bot_call(call: types.callback_query):
     cmd = call.data.split("_")[1]
     if cmd == nav.BACK[0]:
         await call.message.answer('<b>📚Menu:</b>', reply_markup=nav.main_menu, parse_mode=types.ParseMode.HTML)
-        print('Back')
     if cmd == nav.MAIN[0]:
         await call.message.answer('<b>💲Expenses Menu:</b>', reply_markup=nav.expense_menu, parse_mode=types.ParseMode.HTML)
     if cmd == nav.EXP_MENU[0]: #Add Expense
@@ -168,6 +188,9 @@ async def bot_call(call: types.callback_query):
         await call.message.answer(f'<b>Choose your Zodiac sign</b>', reply_markup=nav.zodiac_menu, parse_mode=types.ParseMode.HTML)
     if cmd in nav.ZODIAC_SINGS: # Zodiac Chose
         await call.message.answer(f'<b>Horoscope for {cmd}</b>\n + {horoscope(cmd)}', reply_markup=nav.cancel_menu, parse_mode=types.ParseMode.HTML)
+    if cmd in nav.MAIN[4]: # coins
+        # coins_message()
+        await call.message.answer(f'<b>Coins</b>\n{coins_message()}', reply_markup=nav.cancel_menu, parse_mode=types.ParseMode.HTML)
     await call.message.delete()
     if cmd == nav.MAIN[1]: # Dairy
         await call.message.answer('<b>📝Write down your diary today:</b>', reply_markup=nav.cancel_menu, parse_mode=types.ParseMode.HTML)
@@ -232,6 +255,17 @@ async def expense_add(message: types.Message, state: FSMContext):
     await state.finish()
     await message.answer('<b>📚Menu:</b>', reply_markup=nav.main_menu, parse_mode=types.ParseMode.HTML)
 
+# Выход из машины состояний
+@dp.callback_query_handler(text=f"btn_{nav.BACK[0]}", state="*")
+async def cancel_handler(call: types.callback_query, state: FSMContext):
+    current_state = await state.get_state()
+    if current_state is not None:
+        await state.finish()
+        await call.answer('OK')
+    await call.message.answer(f'<b>📚Menu:</b>', reply_markup=nav.main_menu, parse_mode=types.ParseMode.HTML)
+    await call.message.delete()
+
+
 @dp.message_handler(Text(startswith=["Bot", "Бот", "/"]))
 async def generate_response(message: types.Message):
     user_id = message.from_user.id
@@ -251,19 +285,17 @@ async def scheduler():
     aioschedule.every().day.at("21:00").do(alert_exp)
     aioschedule.every(5).minutes.do(coingecko)
     # aioschedule.every().day.at("7:30").do(morning)
-    # aioschedule.every().hour.do(cm_start)
     while True:
         await aioschedule.run_pending()
         await asyncio.sleep(1)
 
-   
 
 
 async def on_startup(_):
     await bot.set_webhook(WEBHOOK_URL, drop_pending_updates=True)
     asyncio.create_task(scheduler())
     sql_start()
-    coingecko()
+    # await coingecko()
 
 async def on_shutdown(dispatcher):
     await bot.delete_webhook()

@@ -2,7 +2,7 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 import modules.expenses as ex
 
-MAIN = ["💲Expense", "📝Dairy", "😐Emotion", "♈️Zodiac"]
+MAIN = ["💲Expense", "📝Dairy", "😐Emotion", "♈️Zodiac", "💰Coins"]
 EXP_MENU = ["✏️Add Expense", "📚Show Expenses"]
 ZODIAC_SINGS = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"]
 EMOTIONS = ["Joy", "Interest", "Surprise", "Sadness", "Anger", "Disgust", "Contempt", "Fear", "Shame"]

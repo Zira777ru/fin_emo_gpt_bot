@@ -1,8 +1,11 @@
 import requests
+import asyncio
 
 from modules.db import base, cursor
 
-def coingecko():
+
+
+async def coingecko():
     # Make API call
     url = ('https://api.coingecko.com/api/v3/coins/markets?'
            + 'vs_currency=USD&order=market_cap_desc&per_page=250'
@@ -42,17 +45,17 @@ def coingecko():
     # Commit changes and close connection
     print('Coins Added')
     base.commit()
+    await asyncio.sleep(30) # wait for 60 seconds before making another API call
 
-def get_coin_data(symbols):
-    data = {}
+
+def coins_message():
+    data_str = ''
+    symbols = ['BTC', 'ETH', 'XRP']
     for symbol in symbols:
         cursor.execute("SELECT current_price, price_change_percentage_24h FROM coins WHERE symbol=?", (symbol.lower(),))
         result = cursor.fetchone()
         if result:
-            data[symbol] = {"current_price": result[0], "price_change_percentage_24h": result[1]}
+            data_str += f"<b>{symbol} </b>: {result[0]} ({result[1]})\n"
         else:
-            data[symbol] = None
-    return data
-
-
-
+            data_str += f"No data available for {symbol}\n"
+    return data_str
